@@ -36,7 +36,7 @@ def authorization():
     return session
 
 
-def scraper(session):
+def scraper(session, flag='preview'):
     response = session.get(DATAURL)
     print(response.status_code)
     
@@ -51,23 +51,25 @@ def scraper(session):
         img = walpaper.find('img', class_='wallpapers__item__img').get('src')
         size = walpaper.find('div', class_='wallpapers__item__bottom').find('small').text
 
-        img.replace('wallpaper/big', 'original')
         link_download_full_img = img.replace('wallpaper/big', f'original/{size}')
         link_download_preview_img = img.replace('big', 'nbig')
-
         # print(f'Ссылка №{n}: {link_download_preview_img}')
-        # photos_urls.append(link_download_full_img)
 
-        photos_urls.append(link_download_preview_img)
+        link = link_download_preview_img
+        if flag == 'full':
+            link = link_download_full_img
+        
+        photos_urls.append(link)
 
-        if n == 5:
-            break  # first pict for test
+        # count pict for test
+        # if n == 5:
+        #     break
 
     print('------------------------------------------')
     return photos_urls
 
 
-def download_photo(session, one_urls, name):
+def download_photo(session, one_urls, path):
 
     response = session.get(one_urls)
     with open(path, 'wb') as file:
@@ -78,25 +80,46 @@ def download_photo(session, one_urls, name):
 def name_file(one_urls):
     tail, _, _ = one_urls[::-1].partition('/')
     name = tail[::-1][:-4]
-    return name
+
+    folder = 'media/full'
+    if 'nbig' in one_urls:
+        name += '_preview'
+        folder = 'media/preview'
 
 
-if __name__ == '__main__':
-    session = authorization()
+    print(f'Имя файла: {name}')
 
-    photos_urls = scraper(session)
+    path = os.path.join(folder, f'{name}.jpg')
+
+    return path
+
+
+def checking_and_download_call(photos_urls):
 
     for one_urls in photos_urls:
-        name = name_file(one_urls)
-
-        print(f'Имя файла: {name}')
-
-        path = os.path.join('media', f'{name}.jpg')
+        path = name_file(one_urls)
         print(path)
         
         if not os.path.isfile(path):
             print('-----Файла нет => начинаю загрузку-----')
-            download_photo(session, one_urls, name)
+            download_photo(session, one_urls, path)
         else:
             print('-----Файл уже существует => не загружаю-----')
             print('')
+
+
+if __name__ == '__main__':
+
+    # full = 'Yes'
+    full = None
+    session = authorization()  # with authorization
+    # session = requests
+
+    if full:
+        # Full
+        photos_urls = scraper(session, flag='full')
+    else:
+        # Preview & without authorization -- commit for Full
+        photos_urls = scraper(session)
+
+    checking_and_download_call(photos_urls)
