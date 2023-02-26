@@ -7,7 +7,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 LOGINURL = 'https://www.goodfon.ru/auth/signin/'
-DATAURL = 'https://www.goodfon.ru/search/?q=cars'
+DATAURL = 'https://www.goodfon.ru/search/?q=cars'  # default value
+GOODFON_URL = os.getenv('GOODFON_URL')
+
+if not GOODFON_URL:
+    print('URL CARS')
+else:
+    DATAURL = GOODFON_URL
+    print('URL from env')
+print(DATAURL)
 
 USERNAME = os.getenv('GOODFON_USERNAME')
 PASSWORD = os.getenv('GOODFON_PASSWORD')
@@ -79,20 +87,30 @@ def open_photo(session, photos_urls):
         print(f'Прямая ссылка на фото: {foto}')
 
         n += 1
+        return foto
 
-        # Name for pict
-        tail, _, _ = foto[::-1].partition('/')
-        name = tail[::-1][:-4]
-        print(f'Имя файла: {name}')
+def save_photo(foto):
 
-        path = os.path.join('media', f'{name}.jpg')
-        r = session.get(foto)
-        with open(path, 'wb') as f:
-            f.write(r.content)  # Retrieve HTTP meta-data
+    # Name for pict
+    tail, _, _ = foto[::-1].partition('/')
+    name = tail[::-1][:-4]
+    print(f'Имя файла: {name}')
+
+    path = os.path.join('media', f'{name}.jpg')
+    
+    if not os.path.isfile(path):
+        response = session.get(foto)
+        with open(path, 'wb') as file:
+            file.write(response.content)  # Retrieve HTTP meta-data
+            print('-----Saving completed-----')
+    else:
+        print('-----Файл уже существует-----')
+
 
 
 if __name__ == '__main__':
     session = authorization()
     photos_urls = scraper(session)
     
-    open_photo(session, photos_urls)
+    foto = open_photo(session, photos_urls)
+    save_photo(foto)
