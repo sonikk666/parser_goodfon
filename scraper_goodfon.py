@@ -10,12 +10,8 @@ LOGINURL = 'https://www.goodfon.ru/auth/signin/'
 DATAURL = 'https://www.goodfon.ru/search/?q=cars'  # default value
 GOODFON_URL = os.getenv('GOODFON_URL')
 
-if not GOODFON_URL:
-    print('URL CARS')
-else:
+if GOODFON_URL:
     DATAURL = GOODFON_URL
-    print('URL from env')
-print(DATAURL)
 
 USERNAME = os.getenv('GOODFON_USERNAME')
 PASSWORD = os.getenv('GOODFON_PASSWORD')
@@ -37,80 +33,70 @@ def authorization():
     # Authenticate
     session.post(LOGINURL, data=formdata, headers=req_headers, allow_redirects=False)
 
-    # Read data
-    r2 = session.get(DATAURL)
-    # print(r2.status_code)
-
     return session
-
 
 
 def scraper(session):
     response = session.get(DATAURL)
-
+    print(response.status_code)
+    
     soup = BeautifulSoup(response.text, 'html.parser')
-    links = soup.find_all('a')
+    walpapers = soup.find_all('div', class_='wallpapers__item')
+
+    photos_urls = []
 
     n = 0
-    photos = []
-    for link in links:
-        url = link.get('href')
-        if url.find('.html') != -1:
-            n += 1
-            photos.append(url)
+    for walpaper in walpapers:
+        n += 1
+        img = walpaper.find('img', class_='wallpapers__item__img').get('src')
+        size = walpaper.find('div', class_='wallpapers__item__bottom').find('small').text
+
+        img.replace('wallpaper/big', 'original')
+        link_download_full_img = img.replace('wallpaper/big', f'original/{size}')
+        link_download_preview_img = img.replace('big', 'nbig')
+
+        # print(f'Ссылка №{n}: {link_download_preview_img}')
+        # photos_urls.append(link_download_full_img)
+
+        photos_urls.append(link_download_preview_img)
+
+        if n == 5:
             break  # first pict for test
 
-    print(f'Список фото-url: {photos}')
-    return photos
+    print('------------------------------------------')
+    return photos_urls
 
 
+def download_photo(session, one_urls, name):
 
-def open_photo(session, photos_urls):
-    response = session.get(DATAURL)
-    n = 0
+    response = session.get(one_urls)
+    with open(path, 'wb') as file:
+        file.write(response.content)  # Retrieve HTTP meta-data
+        print('-----Saving completed-----')
+        print('')
 
-    fotos = []
-
-    for photo_url in photos_urls:
-
-        response_photo = session.get(photo_url)
-    
-        soup = BeautifulSoup(response_photo.text, 'html.parser')
-        links = soup.find('div', class_='wallpaper__download').find('a').get('href')
-        prefix = 'https://www.goodfon.ru'
-        path = f'{prefix}{links}'
-
-        response1 = session.get(path)
-
-        soup = BeautifulSoup(response1.text, 'html.parser')
-        foto = soup.find('div', class_='text_center').find('a').get('href')
-        print(f'Прямая ссылка на фото: {foto}')
-
-        n += 1
-        return foto
-
-def save_photo(foto):
-
-    # Name for pict
-    tail, _, _ = foto[::-1].partition('/')
+def name_file(one_urls):
+    tail, _, _ = one_urls[::-1].partition('/')
     name = tail[::-1][:-4]
-    print(f'Имя файла: {name}')
-
-    path = os.path.join('media', f'{name}.jpg')
-    
-    if not os.path.isfile(path):
-        response = session.get(foto)
-        with open(path, 'wb') as file:
-            file.write(response.content)  # Retrieve HTTP meta-data
-            print('-----Saving completed-----')
-    else:
-        print('-----Файл уже существует-----')
-
+    return name
 
 
 if __name__ == '__main__':
     session = authorization()
+
     photos_urls = scraper(session)
-    
-    foto = open_photo(session, photos_urls)
-    save_photo(foto)
+
+    for one_urls in photos_urls:
+        name = name_file(one_urls)
+
+        print(f'Имя файла: {name}')
+
+        path = os.path.join('media', f'{name}.jpg')
+        print(path)
+        
+        if not os.path.isfile(path):
+            print('-----Файла нет => начинаю загрузку-----')
+            download_photo(session, one_urls, name)
+        else:
+            print('-----Файл уже существует => не загружаю-----')
+            print('')
