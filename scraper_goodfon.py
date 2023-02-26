@@ -37,13 +37,11 @@ def authorization():
 
 
 
-def scraper():
-    session = authorization()
+def scraper(session):
     response = session.get(DATAURL)
 
     soup = BeautifulSoup(response.text, 'html.parser')
     links = soup.find_all('a')
-    # print(links)
 
     n = 0
     photos = []
@@ -52,16 +50,15 @@ def scraper():
         if url.find('.html') != -1:
             n += 1
             photos.append(url)
+            break  # first pict for test
 
-    print(photos)
+    print(f'Список фото-url: {photos}')
     return photos
 
 
 
-def open_photo():
-    session = authorization()
+def open_photo(session, photos_urls):
     response = session.get(DATAURL)
-    photos_urls = scraper()
     n = 0
 
     fotos = []
@@ -79,16 +76,23 @@ def open_photo():
 
         soup = BeautifulSoup(response1.text, 'html.parser')
         foto = soup.find('div', class_='text_center').find('a').get('href')
+        print(f'Прямая ссылка на фото: {foto}')
 
         n += 1
-        path = os.path.join('media', f'{n}.jpg')
-        print(foto)
+
+        # Name for pict
+        tail, _, _ = foto[::-1].partition('/')
+        name = tail[::-1][:-4]
+        print(f'Имя файла: {name}')
+
+        path = os.path.join('media', f'{name}.jpg')
         r = session.get(foto)
         with open(path, 'wb') as f:
             f.write(r.content)  # Retrieve HTTP meta-data
 
 
-open_photo()
-
-
-
+if __name__ == '__main__':
+    session = authorization()
+    photos_urls = scraper(session)
+    
+    open_photo(session, photos_urls)
