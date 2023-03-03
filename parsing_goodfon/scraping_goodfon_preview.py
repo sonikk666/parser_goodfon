@@ -99,37 +99,7 @@ def scraper(session, flag='preview'):
     return photo_urls, number_img
 
 
-def download_photo(session, one_url, path):
-
-    response = session.get(one_url)
-    with open(path, 'wb') as file:
-        file.write(response.content)
-        print('-----Saving completed-----')
-
-
-def folder_creation(folder):
-
-    if not os.path.isdir(folder):
-        os.makedirs(folder)
-
-
-def name_and_path_file(one_url, size, path_full_img):
-    tail, _, _ = one_url[::-1].partition('/')
-    name = tail[::-1][:-4]
-
-    if 'nbig' in one_url:
-        name_preview = f'{name}-_preview_{size}'
-
-    folder = f'media/preview/{date_today}'
-
-    folder_creation(folder)
-
-    path = os.path.join(folder, f'{name_preview}.jpg')
-
-    return path
-
-
-def checking_and_download_call(photo_urls):
+def checking_and_calling_download(photo_urls):
     n = 0
     for one_url, size, path_full_img in photo_urls:
         n += 1
@@ -139,7 +109,7 @@ def checking_and_download_call(photo_urls):
         path = name_and_path_file(one_url, size, path_full_img)
         print(f'path: {path}')
 
-        if not os.path.isfile(path) and 'non_down_non' not in path:
+        if not os.path.isfile(path):
             print('-----Файла нет => начинаю загрузку-----')
             download_photo(session, one_url, path)
             print('')
@@ -148,13 +118,43 @@ def checking_and_download_call(photo_urls):
             print('')
 
 
+def name_and_path_file(one_url, size, path_full_img):
+    tail, _, _ = one_url[::-1].partition('/')
+    name = tail[::-1][:-4]
+
+    if 'nbig' in one_url:
+        name_preview = f'{name}-_preview_{size}'
+
+    folder = f'media/preview/{date_today}/{search_keywords}'
+
+    folder_creation(folder)
+
+    path = os.path.join(folder, f'{name_preview}.jpg')
+
+    return path
+
+
+def folder_creation(folder):
+
+    if not os.path.isdir(folder):
+        os.makedirs(folder)
+
+
+def download_photo(session, one_url, path):
+
+    response = session.get(one_url)
+    with open(path, 'wb') as file:
+        file.write(response.content)
+        print('-----Saving completed-----')
+
+
 if __name__ == '__main__':
 
     session = authorization()  # with authorization
 
     photo_urls, number_img = scraper(session)
 
-    checking_and_download_call(photo_urls)
+    checking_and_calling_download(photo_urls)
 
 end = time.time()
 run_time_for_sec = round(end-start, 1)
