@@ -1,4 +1,7 @@
+import datetime
 import os
+import re
+import time
 
 import requests
 from bs4 import BeautifulSoup
@@ -6,8 +9,24 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+date_today = datetime.date.today()
+
+search_keywords = input(
+    'Введите ключевые слова для поиска (по умолчанию = car): '
+) or 'car'
+
+n_page = int(input(
+    'С какой страницы начать парсинг (по умолчанию = 1): '
+) or 1)
+
+page_count = int(input(
+    'Введите количество страниц (по умолчанию = 3): '
+) or 3)
+
+start = time.time()
+
 LOGINURL = 'https://www.goodfon.ru/auth/signin/'
-DATAURL = 'https://www.goodfon.ru/search/?q=cars&page=1'  # default value
+DATAURL = f'https://www.goodfon.ru/search/?q={search_keywords}&page={n_page}'
 GOODFON_URL = os.getenv('GOODFON_URL')
 
 if GOODFON_URL:
@@ -16,23 +35,21 @@ if GOODFON_URL:
 USERNAME = os.getenv('GOODFON_USERNAME')
 PASSWORD = os.getenv('GOODFON_PASSWORD')
 
-photos_urls = []
+IMGS_ON_PAGE = 24
+
+photo_urls = []
 
 
 def authorization():
     session = requests.session()
-
     req_headers = {
         'Content-Type': 'application/x-www-form-urlencoded'
     }
-
     formdata = {
         'login': USERNAME,
         'password': PASSWORD,
         'loginButton': 'Войти',
     }
-
-    # Authenticate
     session.post(
         LOGINURL, data=formdata,
         headers=req_headers, allow_redirects=False
@@ -46,24 +63,20 @@ def scraper(session, flag='preview'):
 
     soup = BeautifulSoup(response.text, 'html.parser')
     pagination_info = soup.find('div', class_='paginator__page').text
-    count_pages = pagination_info.replace(
-        ' ', ''
-    ).replace('1из', '').replace('\n', '')
-    print(int(count_pages))
+    count_pages = re.sub(r'^(\D+)(?:\d+)|(\D+)', '', pagination_info)
 
-    for page in range(1, int(count_pages)):
-        print(page)
-        url = DATAURL.replace('page=1', f'page={page}')
-        # print(response.status_code)
-        # print(url)
+    for page in range(n_page, int(count_pages)):
+        print(f'Страница № {page}')
+        url = DATAURL.replace(f'page={n_page}', f'page={page}')
         response = session.get(url)
         soup = BeautifulSoup(response.text, 'html.parser')
-
         walpapers = soup.find_all('div', class_='wallpapers__item')
 
         n = 0
         for walpaper in walpapers:
             n += 1
+
+            path_full_img = walpaper.find('a').get('href')
             img = walpaper.find(
                 'img', class_='wallpapers__item__img'
             ).get('src')
@@ -71,63 +84,65 @@ def scraper(session, flag='preview'):
                 'div', class_='wallpapers__item__bottom'
             ).find('small').text
 
-            link_download_full_img = img.replace(
-                'wallpaper/big', f'original/{size}'
-            )
-            link_download_preview_img = img.replace('big', 'nbig')
-            # print(f'Ссылка №{n}: {link_download_preview_img}')
+            link_download_preview_img = img.replace('/big/', '/nbig/')
 
-            link = link_download_preview_img
-            if flag == 'full':
-                link = link_download_full_img
+            img = (link_download_preview_img, size, path_full_img)
+            number_img = n + IMGS_ON_PAGE * (page - n_page)
+            photo_urls.append(img)
 
-            photos_urls.append(link)
-
-            # count pict for test
-            if n == 5:
+            if n == IMGS_ON_PAGE:
                 break
-
         print('------------------------------------------')
-        # count page for test
-        if page == 6:
+
+        if page == (n_page-1) + page_count:
             break
-    return photos_urls
+    return photo_urls, number_img
 
 
-def download_photo(session, one_urls, path):
+def download_photo(session, one_url, path):
 
-    response = session.get(one_urls)
+    response = session.get(one_url)
     with open(path, 'wb') as file:
-        file.write(response.content)  # Retrieve HTTP meta-data
+        file.write(response.content)
         print('-----Saving completed-----')
-        print('')
 
 
-def name_and_path_file(one_urls):
-    tail, _, _ = one_urls[::-1].partition('/')
+def folder_creation(folder):
+
+    if not os.path.isdir(folder):
+        os.makedirs(folder)
+
+
+def name_and_path_file(one_url, size, path_full_img):
+    tail, _, _ = one_url[::-1].partition('/')
     name = tail[::-1][:-4]
 
-    folder = 'media/full'
-    if 'nbig' in one_urls:
-        name += '_preview'
-        folder = 'media/preview'
+    if 'nbig' in one_url:
+        name_preview = f'{name}-_preview_{size}'
 
-    print(f'Имя файла: {name}')
+    folder = f'media/preview/{date_today}'
 
-    path = os.path.join(folder, f'{name}.jpg')
+    folder_creation(folder)
+
+    path = os.path.join(folder, f'{name_preview}.jpg')
 
     return path
 
 
-def checking_and_download_call(photos_urls):
+def checking_and_download_call(photo_urls):
+    n = 0
+    for one_url, size, path_full_img in photo_urls:
+        n += 1
+        print(f'Обои № {n}')
+        print(f'URL: {one_url}, {size}')
 
-    for one_urls in photos_urls:
-        path = name_and_path_file(one_urls)
-        print(path)
+        path = name_and_path_file(one_url, size, path_full_img)
+        print(f'path: {path}')
 
-        if not os.path.isfile(path):
+        if not os.path.isfile(path) and 'non_down_non' not in path:
             print('-----Файла нет => начинаю загрузку-----')
-            download_photo(session, one_urls, path)
+            download_photo(session, one_url, path)
+            print('')
         else:
             print('-----Файл уже существует => не загружаю-----')
             print('')
@@ -135,16 +150,17 @@ def checking_and_download_call(photos_urls):
 
 if __name__ == '__main__':
 
-    # full = 'Yes'
-    full = None
     session = authorization()  # with authorization
-    # session = requests
 
-    if full:
-        # Full
-        photos_urls = scraper(session, flag='full')
-    else:
-        # Preview & without authorization -- commit for Full
-        photos_urls = scraper(session)
+    photo_urls, number_img = scraper(session)
 
-    checking_and_download_call(photos_urls)
+    checking_and_download_call(photo_urls)
+
+end = time.time()
+run_time_for_sec = round(end-start, 1)
+run_time_for_min = round((end-start)/60, 1)
+print(
+    'Время выполнения программы составляет :'
+    f'{run_time_for_sec} сек или {run_time_for_min} мин'
+)
+print(f'Всего обработано изображений: {number_img}')
