@@ -1,6 +1,7 @@
 import datetime
 import os
 import re
+import sqlite3
 import time
 
 import requests
@@ -85,8 +86,15 @@ def scraper(session, flag='preview'):
             ).find('small').text
 
             link_download_preview_img = img.replace('/big/', '/nbig/')
+            link_download_full_img = img.replace(
+                'wallpaper/big', f'original/{size}'
+            )
 
-            img = (link_download_preview_img, size, path_full_img)
+            img = (
+                None,
+                link_download_preview_img, size,
+                path_full_img, link_download_full_img,
+            )
             number_img = n + IMGS_ON_PAGE * (page - n_page)
             photo_urls.append(img)
 
@@ -101,12 +109,12 @@ def scraper(session, flag='preview'):
 
 def checking_and_calling_download(photo_urls):
     n = 0
-    for one_url, size, path_full_img in photo_urls:
+    for _, one_url, size, _, _ in photo_urls:
         n += 1
         print(f'Обои № {n}')
         print(f'URL: {one_url}, {size}')
 
-        path = name_and_path_file(one_url, size, path_full_img)
+        path = name_and_path_file(one_url, size)
         print(f'path: {path}')
 
         if not os.path.isfile(path):
@@ -118,7 +126,7 @@ def checking_and_calling_download(photo_urls):
             print('')
 
 
-def name_and_path_file(one_url, size, path_full_img):
+def name_and_path_file(one_url, size):
     tail, _, _ = one_url[::-1].partition('/')
     name = tail[::-1][:-4]
 
@@ -148,14 +156,31 @@ def download_photo(session, one_url, path):
         print('-----Saving completed-----')
 
 
+def load_in_db(photo_urls):
+    conn = sqlite3.connect('pictures.db')
+    cur = conn.cursor()
+
+    cur.execute(  # посмотреть как правильно переносить сикюл запросы
+        """CREATE TABLE IF NOT EXISTS pictures(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            link_download_preview TEXT,
+            size TEXT,
+            url_full_with_catalog TEXT,
+            link_download_full_img UNIQUE);
+    """)
+    conn.commit()
+
+    cur.executemany(
+        "INSERT or IGNORE INTO pictures VALUES(?, ?, ?, ?, ?);", photo_urls
+    )
+    conn.commit()
+
+
 if __name__ == '__main__':
-
     session = authorization()  # with authorization
-
     photo_urls, number_img = scraper(session)
-
+    load_in_db(photo_urls)
     checking_and_calling_download(photo_urls)
-
 end = time.time()
 run_time_for_sec = round(end-start, 1)
 run_time_for_min = round((end-start)/60, 1)
