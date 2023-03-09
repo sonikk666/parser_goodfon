@@ -1,3 +1,4 @@
+"""Скрипт для парсинга Goodfon: собирает информацию в БД и скачивает превью."""
 import datetime
 import os
 import re
@@ -42,6 +43,7 @@ photo_urls = []
 
 
 def authorization():
+    """Авторизация на сайте для доступа ко всем катагориям."""
     session = requests.session()
     req_headers = {
         'Content-Type': 'application/x-www-form-urlencoded'
@@ -60,8 +62,8 @@ def authorization():
 
 
 def scraper(session, flag='preview'):
+    """Сбор информации о файлах по заданным страницам."""
     response = session.get(DATAURL)
-
     soup = BeautifulSoup(response.text, 'html.parser')
     pagination_info = soup.find('div', class_='paginator__page').text
     count_pages = re.sub(r'^(\D+)(?:\d+)|(\D+)', '', pagination_info)
@@ -108,6 +110,10 @@ def scraper(session, flag='preview'):
 
 
 def checking_and_calling_download(photo_urls):
+    """Вызов функции получения имени и пути к файлу.
+    Проверка наличия файла.
+    Вызов функции загрузки файла при необходимости.
+    """
     n = 0
     for _, one_url, size, _, _ in photo_urls:
         n += 1
@@ -127,28 +133,28 @@ def checking_and_calling_download(photo_urls):
 
 
 def name_and_path_file(one_url, size):
+    """Получает имя файла из URL и возвращает путь для файла превью.
+    Вызывает функцию создания каталога.
+    """
     tail, _, _ = one_url[::-1].partition('/')
     name = tail[::-1][:-4]
-
-    if 'nbig' in one_url:
-        name_preview = f'{name}-_preview_{size}'
+    name_preview = f'{name}-_preview_{size}'
 
     folder = f'media/preview/{date_today}/{search_keywords}'
-
     folder_creation(folder)
-
     path = os.path.join(folder, f'{name_preview}.jpg')
 
     return path
 
 
 def folder_creation(folder):
-
+    """Создаёт каталог, если его нет."""
     if not os.path.isdir(folder):
         os.makedirs(folder)
 
 
 def download_photo(session, one_url, path):
+    """Скачивает файл превью."""
 
     response = session.get(one_url)
     with open(path, 'wb') as file:
@@ -157,6 +163,9 @@ def download_photo(session, one_url, path):
 
 
 def load_in_db(photo_urls):
+    """Создаёт базу данных, если её нет.
+    Добавляет в неё данные о файлах.
+    """
     conn = sqlite3.connect('pictures.db')
     cur = conn.cursor()
 
@@ -177,10 +186,15 @@ def load_in_db(photo_urls):
 
 
 if __name__ == '__main__':
-    session = authorization()  # with authorization
-    photo_urls, number_img = scraper(session)
-    load_in_db(photo_urls)
-    checking_and_calling_download(photo_urls)
+    try:
+        session = authorization()  # with authorization
+        photo_urls, number_img = scraper(session)
+        load_in_db(photo_urls)
+        checking_and_calling_download(photo_urls)
+    except KeyboardInterrupt:
+        print('Exit to Ctrl+C!')
+
+
 end = time.time()
 run_time_for_sec = round(end-start, 1)
 run_time_for_min = round((end-start)/60, 1)
