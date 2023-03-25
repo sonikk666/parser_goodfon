@@ -76,14 +76,15 @@ def scraper(session, flag='preview'):
         walpapers = soup.find_all('div', class_='wallpapers__item')
 
         n = 0
-        for walpaper in walpapers:
+        for wallpaper in walpapers:
             n += 1
 
-            path_full_img = walpaper.find('a').get('href')
-            img = walpaper.find(
+            path_full_img = wallpaper.find('a').get('href')
+            title = wallpaper.find('a').get('title')
+            img = wallpaper.find(
                 'img', class_='wallpapers__item__img'
             ).get('src')
-            size = walpaper.find(
+            size = wallpaper.find(
                 'div', class_='wallpapers__item__bottom'
             ).find('small').text
 
@@ -95,7 +96,7 @@ def scraper(session, flag='preview'):
             img = (
                 None,
                 link_download_preview_img, size,
-                path_full_img, link_download_full_img,
+                path_full_img, link_download_full_img, title
             )
             number_img = n + IMGS_ON_PAGE * (page - n_page)
             photo_urls.append(img)
@@ -115,7 +116,7 @@ def checking_and_calling_download(photo_urls):
     Вызов функции загрузки файла при необходимости.
     """
     n = 0
-    for _, one_url, size, _, _ in photo_urls:
+    for _, one_url, size, _, _, title in photo_urls:
         n += 1
         print(f'Обои № {n}')
         print(f'URL: {one_url}, {size}')
@@ -169,20 +170,21 @@ def load_in_db(photo_urls):
     conn = sqlite3.connect('pictures.db')
     cur = conn.cursor()
 
-    cur.execute(  # посмотреть как правильно переносить сикюл запросы
-        """CREATE TABLE IF NOT EXISTS pictures(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            link_download_preview TEXT,
-            size TEXT,
-            url_full_with_catalog TEXT,
-            link_download_full_img UNIQUE);
-    """)
+    cur.execute("""CREATE TABLE IF NOT EXISTS pictures(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        link_download_preview TEXT,
+        size TEXT,
+        url_full_with_catalog TEXT,
+        link_download_full_img UNIQUE,
+        title TEXT
+        );""")
     conn.commit()
 
     cur.executemany(
-        "INSERT or IGNORE INTO pictures VALUES(?, ?, ?, ?, ?);", photo_urls
+        "INSERT or IGNORE INTO pictures VALUES(?, ?, ?, ?, ?, ?);", photo_urls
     )
     conn.commit()
+    conn.close()
 
 
 if __name__ == '__main__':

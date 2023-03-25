@@ -19,8 +19,10 @@ DIR_FULL = 'media/full/Downloads'
 
 
 def list_dir():
-    for root, dirs, files in os.walk(DIR_PREVIEW):
+    if not os.path.isdir(DIR_PREVIEW):
+        print('Папки Downloads нет')
 
+    for root, dirs, files in os.walk(DIR_PREVIEW):
         n = 0
         for file in files:
             start = time.time()
@@ -48,7 +50,9 @@ def list_dir():
 
             n += 1
             checkIP()
-            print(f'File № {n} - {size_file} kB - loaded for {run_time_for_sec} s')
+            print(
+                f'File № {n} - {size_file} kB - loaded for {run_time_for_sec}s'
+            )
             count_files()
 
             if size_file == 0:
