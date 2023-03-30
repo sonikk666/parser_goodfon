@@ -27,12 +27,12 @@ page_count = int(input(
 
 start = time.time()
 
-LOGINURL = 'https://www.goodfon.ru/auth/signin/'
-DATAURL = f'https://www.goodfon.ru/search/?q={search_keywords}&page={n_page}'
+LOGIN_URL = 'https://www.goodfon.ru/auth/signin/'
+DATA_URL = f'https://www.goodfon.ru/search/?q={search_keywords}&page={n_page}'
 GOODFON_URL = os.getenv('GOODFON_URL')
 
 if GOODFON_URL:
-    DATAURL = GOODFON_URL
+    DATA_URL = GOODFON_URL
 
 USERNAME = os.getenv('GOODFON_USERNAME')
 PASSWORD = os.getenv('GOODFON_PASSWORD')
@@ -43,7 +43,7 @@ photo_urls = []
 
 
 def authorization():
-    """Авторизация на сайте для доступа ко всем катагориям."""
+    """Авторизация на сайте для доступа ко всем категориям."""
     session = requests.session()
     req_headers = {
         'Content-Type': 'application/x-www-form-urlencoded'
@@ -54,7 +54,7 @@ def authorization():
         'loginButton': 'Войти',
     }
     session.post(
-        LOGINURL, data=formdata,
+        LOGIN_URL, data=formdata,
         headers=req_headers, allow_redirects=False
     )
 
@@ -63,20 +63,20 @@ def authorization():
 
 def scraper(session, flag='preview'):
     """Сбор информации о файлах по заданным страницам."""
-    response = session.get(DATAURL)
+    response = session.get(DATA_URL)
     soup = BeautifulSoup(response.text, 'html.parser')
     pagination_info = soup.find('div', class_='paginator__page').text
     count_pages = re.sub(r'^(\D+)(?:\d+)|(\D+)', '', pagination_info)
 
     for page in range(n_page, int(count_pages)):
         print(f'Страница № {page}')
-        url = DATAURL.replace(f'page={n_page}', f'page={page}')
+        url = DATA_URL.replace(f'page={n_page}', f'page={page}')
         response = session.get(url)
         soup = BeautifulSoup(response.text, 'html.parser')
-        walpapers = soup.find_all('div', class_='wallpapers__item')
+        wallpapers = soup.find_all('div', class_='wallpapers__item')
 
         n = 0
-        for wallpaper in walpapers:
+        for wallpaper in wallpapers:
             n += 1
 
             path_full_img = wallpaper.find('a').get('href')
