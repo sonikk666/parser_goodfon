@@ -2,12 +2,13 @@
 .env
 .vscode/
 /media
+/Features_development
 *.db
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
-*$py.class
+*$py.classfunctions development
 
 # C extensions
 *.so
