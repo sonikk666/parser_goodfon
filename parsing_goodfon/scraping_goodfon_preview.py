@@ -17,18 +17,20 @@ search_keywords = input(
     'Введите ключевые слова для поиска (по умолчанию = car): '
 ) or 'car'
 
-n_page = int(input(
+start_page = int(input(
     'С какой страницы начать парсинг (по умолчанию = 1): '
 ) or 1)
 
-page_count = int(input(
-    'Введите количество страниц (по умолчанию = 3): '
+pages_count = int(input(
+    'Введите количество страниц для парсинга(по умолчанию = 3): '
 ) or 3)
 
 start = time.time()
 
 LOGIN_URL = 'https://www.goodfon.ru/auth/signin/'
-DATA_URL = f'https://www.goodfon.ru/search/?q={search_keywords}&page={n_page}'
+DATA_URL = (
+    f'https://www.goodfon.ru/search/?q={search_keywords}&page={start_page}'
+)
 GOODFON_URL = os.getenv('GOODFON_URL')
 
 if GOODFON_URL:
@@ -66,18 +68,16 @@ def scraper(session, flag='preview'):
     response = session.get(DATA_URL)
     soup = BeautifulSoup(response.text, 'html.parser')
     pagination_info = soup.find('div', class_='paginator__page').text
-    count_pages = re.sub(r'^(\D+)(?:\d+)|(\D+)', '', pagination_info)
+    total_pages = re.sub(r'^(\D+)(?:\d+)|(\D+)', '', pagination_info)
 
-    for page in range(n_page, int(count_pages)):
-        print(f'Страница № {page}')
-        url = DATA_URL.replace(f'page={n_page}', f'page={page}')
+    for current_page in range(start_page, int(total_pages)):
+        print(f'Страница № {current_page}')
+        url = DATA_URL.replace(f'page={start_page}', f'page={current_page}')
         response = session.get(url)
         soup = BeautifulSoup(response.text, 'html.parser')
         wallpapers = soup.find_all('div', class_='wallpapers__item')
 
-        n = 0
-        for wallpaper in wallpapers:
-            n += 1
+        for count_wallpaper, wallpaper in enumerate(wallpapers, start=1):
 
             path_full_img = wallpaper.find('a').get('href')
             title = wallpaper.find('a').get('title')
@@ -98,27 +98,25 @@ def scraper(session, flag='preview'):
                 link_download_preview_img, size,
                 path_full_img, link_download_full_img, title
             )
-            number_img = n + IMGS_ON_PAGE * (page - n_page)
+            number_img = count_wallpaper + IMGS_ON_PAGE * (
+                current_page - start_page
+            )
             photo_urls.append(img)
 
-            if n == IMGS_ON_PAGE:
-                break
         print('------------------------------------------')
 
-        if page == (n_page-1) + page_count:
+        if current_page == (start_page-1) + pages_count:
             break
     return photo_urls, number_img
 
 
-def checking_and_calling_download(photo_urls):
+def checking_and_calling_download(photo_urls, number_img):
     """Вызов функции получения имени и пути к файлу.
     Проверка наличия файла.
     Вызов функции загрузки файла при необходимости.
     """
-    n = 0
     for _, one_url, size, _, _, title in photo_urls:
-        n += 1
-        print(f'Обои № {n}')
+        print(f'[+] Обои № {number_img}')
         print(f'URL: {one_url}, {size}')
 
         path = name_and_path_file(one_url, size)
@@ -192,7 +190,7 @@ if __name__ == '__main__':
         session = authorization()  # with authorization
         photo_urls, number_img = scraper(session)
         load_in_db(photo_urls)
-        checking_and_calling_download(photo_urls)
+        checking_and_calling_download(photo_urls, number_img)
     except KeyboardInterrupt:
         print('Exit to Ctrl+C!')
 

@@ -20,7 +20,7 @@ DIR_FULL = 'media/full/Downloads'
 
 def list_dir():
     if not os.path.isdir(DIR_PREVIEW):
-        print('Папки Downloads нет')
+        print('[+] Папки Downloads нет')
 
     for root, dirs, files in os.walk(DIR_PREVIEW):
         n = 0
