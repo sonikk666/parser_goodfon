@@ -39,8 +39,6 @@ if GOODFON_URL:
 USERNAME = os.getenv('GOODFON_USERNAME')
 PASSWORD = os.getenv('GOODFON_PASSWORD')
 
-IMGS_ON_PAGE = 24
-
 photo_urls = []
 
 
@@ -63,7 +61,7 @@ def authorization():
     return session
 
 
-def scraper(session, flag='preview'):
+def scraper(session):
     """Сбор информации о файлах по заданным страницам."""
     response = session.get(DATA_URL)
     soup = BeautifulSoup(response.text, 'html.parser')
@@ -77,7 +75,7 @@ def scraper(session, flag='preview'):
         soup = BeautifulSoup(response.text, 'html.parser')
         wallpapers = soup.find_all('div', class_='wallpapers__item')
 
-        for count_wallpaper, wallpaper in enumerate(wallpapers, start=1):
+        for wallpaper in wallpapers:
 
             path_full_img = wallpaper.find('a').get('href')
             title = wallpaper.find('a').get('title')
@@ -98,24 +96,21 @@ def scraper(session, flag='preview'):
                 link_download_preview_img, size,
                 path_full_img, link_download_full_img, title
             )
-            number_img = count_wallpaper + IMGS_ON_PAGE * (
-                current_page - start_page
-            )
             photo_urls.append(img)
 
         print('------------------------------------------')
 
         if current_page == (start_page-1) + pages_count:
             break
-    return photo_urls, number_img
+    return photo_urls
 
 
-def checking_and_calling_download(photo_urls, number_img):
+def checking_and_calling_download(photo_urls):
     """Вызов функции получения имени и пути к файлу.
     Проверка наличия файла.
     Вызов функции загрузки файла при необходимости.
     """
-    for _, one_url, size, _, _, title in photo_urls:
+    for number_img, (_, one_url, size, _, _, title) in enumerate(photo_urls, start=1):
         print(f'[+] Обои № {number_img}')
         print(f'URL: {one_url}, {size}')
 
@@ -188,9 +183,9 @@ def load_in_db(photo_urls):
 if __name__ == '__main__':
     try:
         session = authorization()  # with authorization
-        photo_urls, number_img = scraper(session)
+        photo_urls = scraper(session)
         load_in_db(photo_urls)
-        checking_and_calling_download(photo_urls, number_img)
+        checking_and_calling_download(photo_urls)
     except KeyboardInterrupt:
         print('Exit to Ctrl+C!')
 
@@ -202,4 +197,4 @@ print(
     'Время выполнения программы составляет :'
     f'{run_time_for_sec} сек или {run_time_for_min} мин'
 )
-print(f'Всего обработано изображений: {number_img}')
+print(f'Всего обработано изображений: {len(photo_urls)}')
