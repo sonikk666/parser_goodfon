@@ -11,7 +11,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-date_today = datetime.date.today()
 
 search_keywords = input(
     'Введите ключевые слова для поиска (по умолчанию = car): '
@@ -25,21 +24,12 @@ pages_count = int(input(
     'Введите количество страниц для парсинга(по умолчанию = 3): '
 ) or 3)
 
-start = time.time()
-
 LOGIN_URL = 'https://www.goodfon.ru/auth/signin/'
 DATA_URL = (
     f'https://www.goodfon.ru/search/?q={search_keywords}&page={start_page}'
 )
-GOODFON_URL = os.getenv('GOODFON_URL')
-
-if GOODFON_URL:
-    DATA_URL = GOODFON_URL
-
 USERNAME = os.getenv('GOODFON_USERNAME')
 PASSWORD = os.getenv('GOODFON_PASSWORD')
-
-photo_urls = []
 
 
 def authorization():
@@ -63,6 +53,7 @@ def authorization():
 
 def scraper(session):
     """Сбор информации о файлах по заданным страницам."""
+    photo_urls = []
     response = session.get(DATA_URL)
     soup = BeautifulSoup(response.text, 'html.parser')
     pagination_info = soup.find('div', class_='paginator__page').text
@@ -91,12 +82,12 @@ def scraper(session):
                 'wallpaper/big', f'original/{size}'
             )
 
-            img = (
+            data_one_photo = (
                 None,
                 link_download_preview_img, size,
                 path_full_img, link_download_full_img, title
             )
-            photo_urls.append(img)
+            photo_urls.append(data_one_photo)
 
         print('------------------------------------------')
 
@@ -105,12 +96,14 @@ def scraper(session):
     return photo_urls
 
 
-def checking_and_calling_download(photo_urls):
+def checking_and_calling_download(photo_urls, session):
     """Вызов функции получения имени и пути к файлу.
     Проверка наличия файла.
     Вызов функции загрузки файла при необходимости.
     """
-    for number_img, (_, one_url, size, _, _, title) in enumerate(photo_urls, start=1):
+    for number_img, data_one_photo in enumerate(photo_urls, start=1):
+        _, one_url, size, *other = data_one_photo
+
         print(f'[+] Обои № {number_img}')
         print(f'URL: {one_url}, {size}')
 
@@ -130,6 +123,7 @@ def name_and_path_file(one_url, size):
     """Получает имя файла из URL и возвращает путь для файла превью.
     Вызывает функцию создания каталога.
     """
+    date_today = datetime.date.today()
     tail, _, _ = one_url[::-1].partition('/')
     name = tail[::-1][:-4]
     name_preview = f'{name}-_preview_{size}'
@@ -180,21 +174,33 @@ def load_in_db(photo_urls):
     conn.close()
 
 
+def time_of_function(func):
+    def wrapper():
+        start_time = time.time()
+        result = func()
+        end_time = time.time()
+        run_time_for_sec = round(end_time-start_time, 1)
+        run_time_for_min = round((end_time-start_time)/60, 1)
+        print(
+            'Время выполнения программы составляет :'
+            f'{run_time_for_sec} сек. или {run_time_for_min} мин.'
+        )
+
+        return result
+    return wrapper
+
+
+@time_of_function
+def main():
+    session = authorization()
+    photo_urls = scraper(session)
+    load_in_db(photo_urls)
+    checking_and_calling_download(photo_urls, session)
+    print(f'Всего обработано изображений: {len(photo_urls)}')
+
+
 if __name__ == '__main__':
     try:
-        session = authorization()  # with authorization
-        photo_urls = scraper(session)
-        load_in_db(photo_urls)
-        checking_and_calling_download(photo_urls)
+        main()
     except KeyboardInterrupt:
         print('Exit to Ctrl+C!')
-
-
-end = time.time()
-run_time_for_sec = round(end-start, 1)
-run_time_for_min = round((end-start)/60, 1)
-print(
-    'Время выполнения программы составляет :'
-    f'{run_time_for_sec} сек или {run_time_for_min} мин'
-)
-print(f'Всего обработано изображений: {len(photo_urls)}')
