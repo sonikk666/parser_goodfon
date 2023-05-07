@@ -11,17 +11,16 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-
+# Ввод через консоль информации для парсинга:
+# ключевое слово, номер страницы для старта и количество страниц
 search_keywords = input(
     'Введите ключевые слова для поиска (по умолчанию = car): '
 ) or 'car'
-
 start_page = int(input(
     'С какой страницы начать парсинг (по умолчанию = 1): '
 ) or 1)
-
 pages_count = int(input(
-    'Введите количество страниц для парсинга(по умолчанию = 3): '
+    'Введите количество страниц для парсинга (по умолчанию = 3): '
 ) or 3)
 
 LOGIN_URL = 'https://www.goodfon.ru/auth/signin/'
@@ -35,19 +34,18 @@ PASSWORD = os.getenv('GOODFON_PASSWORD')
 def authorization():
     """Авторизация на сайте для доступа ко всем категориям."""
     session = requests.session()
-    req_headers = {
+    required_headers = {
         'Content-Type': 'application/x-www-form-urlencoded'
     }
-    formdata = {
+    form_data = {
         'login': USERNAME,
         'password': PASSWORD,
         'loginButton': 'Войти',
     }
     session.post(
-        LOGIN_URL, data=formdata,
-        headers=req_headers, allow_redirects=False
+        LOGIN_URL, data=form_data,
+        headers=required_headers, allow_redirects=False
     )
-
     return session
 
 
@@ -56,18 +54,21 @@ def scraper(session):
     photo_urls = []
     response = session.get(DATA_URL)
     soup = BeautifulSoup(response.text, 'html.parser')
+    # Взять строку с общим количеством страниц с найденными обоями
     pagination_info = soup.find('div', class_='paginator__page').text
+    # Получить общее количество страниц 
     total_pages = re.sub(r'^(\D+)(?:\d+)|(\D+)', '', pagination_info)
-
+    # Собрать информацию со станицы
     for current_page in range(start_page, int(total_pages)):
         print(f'Страница № {current_page}')
+        # Изменить номер станицы в изначальном URL
         url = DATA_URL.replace(f'page={start_page}', f'page={current_page}')
         response = session.get(url)
         soup = BeautifulSoup(response.text, 'html.parser')
+        # Получить информацию об изображениях на данной странице
         wallpapers = soup.find_all('div', class_='wallpapers__item')
-
         for wallpaper in wallpapers:
-
+            # path_full_img - только для отладки
             path_full_img = wallpaper.find('a').get('href')
             title = wallpaper.find('a').get('title')
             img = wallpaper.find(
@@ -76,21 +77,23 @@ def scraper(session):
             size = wallpaper.find(
                 'div', class_='wallpapers__item__bottom'
             ).find('small').text
-
+            # Получить URL-ы для скачивания (согласно логике сайта)
             link_download_preview_img = img.replace('/big/', '/nbig/')
             link_download_full_img = img.replace(
                 'wallpaper/big', f'original/{size}'
             )
-
+            # Собрать всю нужную информацию в кортеж
             data_one_photo = (
                 None,
-                link_download_preview_img, size,
-                path_full_img, link_download_full_img, title
+                link_download_preview_img,
+                size,
+                path_full_img,
+                link_download_full_img,
+                title,
             )
             photo_urls.append(data_one_photo)
-
         print('------------------------------------------')
-
+        # Завершить, когда просмотрит заданное кол-во страниц
         if current_page == (start_page-1) + pages_count:
             break
     return photo_urls
@@ -151,7 +154,7 @@ def download_photo(session, one_url, path):
 
 
 def load_in_db(photo_urls):
-    """Создаёт базу данных, если её нет.
+    """Создаёт базу данных и таблицу, если её нет.
     Добавляет в неё данные о файлах.
     """
     conn = sqlite3.connect('pictures.db')
@@ -159,12 +162,11 @@ def load_in_db(photo_urls):
 
     cur.execute("""CREATE TABLE IF NOT EXISTS pictures(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        link_download_preview TEXT,
+        link_download_preview_img TEXT,
         size TEXT,
-        url_full_with_catalog TEXT,
+        path_full_img TEXT,
         link_download_full_img UNIQUE,
-        title TEXT
-        );""")
+        title TEXT);""")
     conn.commit()
 
     cur.executemany(
